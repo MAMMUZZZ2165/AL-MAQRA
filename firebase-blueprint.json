@@ -1,0 +1,603 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Student profile, preferences, and cumulative Hifz/recitation analytics.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the student." },
+        "displayName": { "type": "string", "description": "Student English display name." },
+        "arabicName": { "type": "string", "description": "Student Arabic display name." },
+        "email": { "type": "string", "description": "Student email address." },
+        "phone": { "type": "string", "description": "Student phone number." },
+        "country": { "type": "string", "description": "Student country." },
+        "jobTitle": { "type": "string", "description": "Student occupation or role." },
+        "dateOfBirth": { "type": "string", "description": "Formatted date of birth." },
+        "gender": { "type": "string", "enum": ["Male", "Female"], "description": "Student gender." },
+        "preferredLanguage": { "type": "string", "enum": ["en", "ar", "ur"], "description": "UI language preference." },
+        "themeMode": { "type": "string", "enum": ["system", "light", "dark"], "description": "App theme preference." },
+        "readingHours": { "type": "number", "description": "Average/cumulative reading hours." },
+        "avgRating": { "type": "number", "description": "Average teacher evaluation rating (0..5)." },
+        "oneToOneCount": { "type": "integer", "description": "Completed one-to-one sessions count." },
+        "attendedSessionsCount": { "type": "integer", "description": "Total attended sessions count." },
+        "testsCompletedCount": { "type": "integer", "description": "Completed oral tests count." },
+        "memorizedPages": { "type": "integer", "description": "Total memorized Mushaf pages." },
+        "memorizedSurahs": { "type": "integer", "description": "Total memorized Surahs." },
+        "memorizedJuz": { "type": "integer", "description": "Total memorized Juz." },
+        "memorizedAyahs": { "type": "integer", "description": "Total memorized Ayahs." },
+        "memorizedLetters": { "type": "integer", "description": "Estimated memorized Quranic letters." },
+        "gainedDeeds": { "type": "integer", "description": "Gamified reward deeds points." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on last update." }
+      },
+      "required": [
+        "userId", "displayName", "arabicName", "email", "phone", "country",
+        "jobTitle", "dateOfBirth", "gender", "preferredLanguage", "themeMode",
+        "readingHours", "avgRating", "oneToOneCount", "attendedSessionsCount",
+        "testsCompletedCount", "memorizedPages", "memorizedSurahs", "memorizedJuz",
+        "memorizedAyahs", "memorizedLetters", "gainedDeeds", "createdAt", "updatedAt"
+      ]
+    },
+    "JuzProgress": {
+      "title": "JuzProgress",
+      "description": "Per-Juz (1..30) memorization and review tracking record.",
+      "type": "object",
+      "properties": {
+        "juzNumber": { "type": "integer", "description": "Juz number from 1 to 30." },
+        "status": { "type": "string", "enum": ["completed", "in_progress", "incomplete"], "description": "Juz completion status." },
+        "surahSummary": { "type": "string", "description": "Surah span summary for this Juz." },
+        "completedAyahs": { "type": "integer", "description": "Number of Ayahs completed." },
+        "totalAyahs": { "type": "integer", "description": "Total Ayahs in this Juz." },
+        "teacherRating": { "type": "number", "description": "Latest evaluation rating (0..5)." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["juzNumber", "status", "surahSummary", "completedAyahs", "totalAyahs", "teacherRating", "updatedAt"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Student registration in a course or study group.",
+      "type": "object",
+      "properties": {
+        "targetId": { "type": "string", "description": "Catalog ID of the course or group." },
+        "targetType": { "type": "string", "enum": ["course", "group"], "description": "Enrollment type." },
+        "title": { "type": "string", "description": "English title." },
+        "arabicTitle": { "type": "string", "description": "Arabic Halaqah or course title." },
+        "track": { "type": "string", "description": "Curriculum track name." },
+        "mode": { "type": "string", "enum": ["Online", "Offline"], "description": "Delivery mode." },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Expert"], "description": "Skill level." },
+        "language": { "type": "string", "description": "Instruction language." },
+        "teacherName": { "type": "string", "description": "Sheikh or teacher full name." },
+        "teacherCountry": { "type": "string", "description": "Teacher country." },
+        "completedSessions": { "type": "integer", "description": "Sessions completed in this enrollment." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "targetId", "targetType", "title", "arabicTitle", "track", "mode",
+        "level", "language", "teacherName", "teacherCountry", "completedSessions",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "StudentNote": {
+      "title": "StudentNote",
+      "description": "Tajweed correction log, teacher feedback, or personal Ayah note.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Note heading." },
+        "surahRef": { "type": "string", "description": "Surah name or reference." },
+        "ayahRange": { "type": "string", "description": "Ayah number or range." },
+        "category": { "type": "string", "enum": ["tajweed", "feedback", "personal"], "description": "Note category." },
+        "content": { "type": "string", "description": "Note body text." },
+        "teacherName": { "type": "string", "description": "Optional teacher attribution." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["title", "surahRef", "ayahRange", "category", "content", "teacherName", "createdAt", "updatedAt"]
+    },
+    "StudyPlan": {
+      "title": "StudyPlan",
+      "description": "Custom Hifz or recitation schedule.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Plan title." },
+        "dailyTargetPages": { "type": "integer", "description": "Daily target Mushaf pages." },
+        "scheduleDays": { "type": "string", "description": "Scheduled days summary." },
+        "preferredTime": { "type": "string", "description": "Preferred daily time slot." },
+        "status": { "type": "string", "enum": ["active", "paused"], "description": "Plan status." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["title", "dailyTargetPages", "scheduleDays", "preferredTime", "status", "createdAt", "updatedAt"]
+    },
+    "OralTest": {
+      "title": "OralTest",
+      "description": "Scheduled or graded Quran oral evaluation.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Exam title." },
+        "juzRange": { "type": "string", "description": "Evaluated Juz range." },
+        "sheikhName": { "type": "string", "description": "Examining Sheikh." },
+        "scheduledDate": { "type": "string", "description": "Scheduled date and time." },
+        "status": { "type": "string", "enum": ["scheduled", "completed"], "description": "Exam status." },
+        "score": { "type": "integer", "description": "Evaluation score (0..100)." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["title", "juzRange", "sheikhName", "scheduledDate", "status", "score", "createdAt", "updatedAt"]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Earned completion certificate with verification code.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Certificate title." },
+        "track": { "type": "string", "description": "Completed track." },
+        "issuedBy": { "type": "string", "description": "Issuing Sheikh or institute." },
+        "verificationCode": { "type": "string", "description": "Unique verification code." },
+        "issuedDate": { "type": "string", "description": "Date of issuance." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." }
+      },
+      "required": ["title", "track", "issuedBy", "verificationCode", "issuedDate", "createdAt"]
+    },
+    "DirectMessage": {
+      "title": "DirectMessage",
+      "description": "Direct message between student and certified Sheikh or support.",
+      "type": "object",
+      "properties": {
+        "reciterId": { "type": "string", "description": "Reciter identifier." },
+        "reciterName": { "type": "string", "description": "Reciter display name." },
+        "senderRole": { "type": "string", "enum": ["student", "sheikh", "support"], "description": "Sender role." },
+        "body": { "type": "string", "description": "Message text." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." }
+      },
+      "required": ["reciterId", "reciterName", "senderRole", "body", "createdAt"]
+    },
+    "SessionLog": {
+      "title": "SessionLog",
+      "description": "Completed session history record categorized for progress analytics.",
+      "type": "object",
+      "properties": {
+        "courseTitle": { "type": "string", "description": "Course or Halaqah track title." },
+        "arabicTitle": { "type": "string", "description": "Arabic Halaqah title." },
+        "teacherName": { "type": "string", "description": "Sheikh full name." },
+        "teacherCountry": { "type": "string", "description": "Sheikh country." },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Expert"], "description": "Session level." },
+        "sessionCategory": { "type": "string", "enum": ["guest", "registered", "one_to_one"], "description": "History breakdown category." },
+        "completedSessions": { "type": "integer", "description": "Number of sessions completed." },
+        "durationMinutes": { "type": "integer", "description": "Minutes attended." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." }
+      },
+      "required": [
+        "courseTitle", "arabicTitle", "teacherName", "teacherCountry",
+        "level", "sessionCategory", "completedSessions", "durationMinutes", "createdAt"
+      ]
+    },
+    "AppFeedback": {
+      "title": "AppFeedback",
+      "description": "User rating and opinion submission from Home banner.",
+      "type": "object",
+      "properties": {
+        "rating": { "type": "integer", "description": "Star rating 1..5." },
+        "comment": { "type": "string", "description": "Feedback comment." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." }
+      },
+      "required": ["rating", "comment", "createdAt"]
+    },
+    "AdminCourse": {
+      "title": "AdminCourse",
+      "description": "Admin-managed Quran course published to the catalog.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Course title." },
+        "arabicTitle": { "type": "string", "description": "Arabic course title." },
+        "track": { "type": "string", "description": "Curriculum track." },
+        "mode": { "type": "string", "enum": ["Online", "Offline"], "description": "Delivery mode." },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Expert"], "description": "Skill level." },
+        "language": { "type": "string", "description": "Instruction language." },
+        "teacherName": { "type": "string", "description": "Assigned teacher name." },
+        "country": { "type": "string", "description": "Teacher or center country." },
+        "scheduleSummary": { "type": "string", "description": "Weekly schedule summary." },
+        "seatsLeft": { "type": "integer", "description": "Available seats." },
+        "description": { "type": "string", "description": "Course short description." },
+        "visibility": { "type": "string", "enum": ["public"], "description": "Public visibility flag for signed-in students." },
+        "createdBy": { "type": "string", "description": "Creator UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "title", "arabicTitle", "track", "mode", "level", "language",
+        "teacherName", "country", "scheduleSummary", "seatsLeft",
+        "visibility", "createdBy", "createdAt", "updatedAt"
+      ]
+    },
+    "AdminTeacher": {
+      "title": "AdminTeacher",
+      "description": "Admin-managed certified Quran teacher or reciter profile.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Teacher English display name." },
+        "arabicName": { "type": "string", "description": "Teacher Arabic title/name." },
+        "country": { "type": "string", "description": "Country." },
+        "specialty": { "type": "string", "description": "Ijazah / teaching specialty." },
+        "languagesText": { "type": "string", "description": "Comma-separated instruction languages." },
+        "rating": { "type": "number", "description": "Teacher rating (0..5)." },
+        "availableStatus": { "type": "string", "enum": ["available", "busy"], "description": "Live call availability." },
+        "visibility": { "type": "string", "enum": ["public"], "description": "Public visibility flag for signed-in students." },
+        "createdBy": { "type": "string", "description": "Creator UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "name", "arabicName", "country", "specialty", "languagesText",
+        "rating", "availableStatus", "visibility", "createdBy", "createdAt", "updatedAt"
+      ]
+    },
+    "AdminManager": {
+      "title": "AdminManager",
+      "description": "Appointed platform manager authorized to manage courses and teachers.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Manager full name." },
+        "email": { "type": "string", "description": "Lowercase manager Google email." },
+        "phone": { "type": "string", "description": "Manager contact phone." },
+        "role": { "type": "string", "description": "Manager title or responsibility." },
+        "status": { "type": "string", "enum": ["active", "paused"], "description": "Active status." },
+        "createdBy": { "type": "string", "description": "Admin UID who added the manager." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["name", "email", "phone", "role", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "DailyQuote": {
+      "title": "DailyQuote",
+      "description": "Daily Qur'an study & Tajweed quote published by the administrator.",
+      "type": "object",
+      "properties": {
+        "quoteText": { "type": "string", "description": "Quote or Hadith text in English." },
+        "arabicText": { "type": "string", "description": "Optional Arabic Ayah or quote text." },
+        "source": { "type": "string", "description": "Reference source (Surah, Hadith, Scholar)." },
+        "category": { "type": "string", "description": "Category e.g. Tajweed, Study Qur'an, Motivation." },
+        "dateLabel": { "type": "string", "description": "Display date or badge label." },
+        "visibility": { "type": "string", "enum": ["public"], "description": "Public visibility for signed-in users." },
+        "createdBy": { "type": "string", "description": "Admin UID who created the quote." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["quoteText", "arabicText", "source", "category", "dateLabel", "visibility", "createdBy", "createdAt", "updatedAt"]
+    },
+    "LoginEvent": {
+      "title": "LoginEvent",
+      "description": "User sign-in audit and notification record visible to the primary administrator.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Signed-in user UID." },
+        "userName": { "type": "string", "description": "User display name." },
+        "userEmail": { "type": "string", "description": "User email address." },
+        "deviceInfo": { "type": "string", "description": "Device model information." },
+        "status": { "type": "string", "enum": ["unread", "read"], "description": "Admin notification read status." },
+        "loginAt": { "type": "string", "format": "date-time", "description": "Server timestamp of sign-in." }
+      },
+      "required": ["userId", "userName", "userEmail", "deviceInfo", "status", "loginAt"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Trackable invitation link supporting general, course-specific, and group-specific onboarding.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Unique uppercase invitation code matching document ID." },
+        "creatorId": { "type": "string", "description": "Creator Firebase UID." },
+        "creatorName": { "type": "string", "description": "Creator display name." },
+        "creatorEmail": { "type": "string", "description": "Creator email." },
+        "creatorRole": { "type": "string", "enum": ["admin", "student"], "description": "Role of creator." },
+        "targetType": { "type": "string", "enum": ["general", "course", "group"], "description": "Destination scope." },
+        "targetId": { "type": "string", "description": "Optional course or group ID." },
+        "targetTitle": { "type": "string", "description": "Display title of target." },
+        "maxUses": { "type": "integer", "description": "Maximum allowed redemptions." },
+        "usedCount": { "type": "integer", "description": "Current redemption count." },
+        "expiresAtEpochMs": { "type": "integer", "description": "UTC epoch ms when invite expires, or 0 for no expiry." },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Activation status." },
+        "sharePermitted": { "type": "boolean", "description": "Whether student sharing is permitted for this target." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "code", "creatorId", "creatorName", "creatorEmail", "creatorRole",
+        "targetType", "targetId", "targetTitle", "maxUses", "usedCount",
+        "expiresAtEpochMs", "status", "sharePermitted", "createdAt", "updatedAt"
+      ]
+    },
+    "InvitationRedemption": {
+      "title": "InvitationRedemption",
+      "description": "Single-per-user attribution record created when an invited user registers/signs in.",
+      "type": "object",
+      "properties": {
+        "inviteId": { "type": "string", "description": "Invitation document ID." },
+        "inviteCode": { "type": "string", "description": "Redeemed invitation code." },
+        "creatorId": { "type": "string", "description": "Inviter UID for attribution tracking." },
+        "targetType": { "type": "string", "enum": ["general", "course", "group"], "description": "Invitation target type." },
+        "targetId": { "type": "string", "description": "Optional target course/group ID." },
+        "targetTitle": { "type": "string", "description": "Target title." },
+        "userId": { "type": "string", "description": "Redeemed user UID (equals document ID)." },
+        "userName": { "type": "string", "description": "Redeemed user display name." },
+        "userEmail": { "type": "string", "description": "Redeemed user email." },
+        "redeemedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of redemption." }
+      },
+      "required": [
+        "inviteId", "inviteCode", "creatorId", "targetType", "targetId",
+        "targetTitle", "userId", "userName", "userEmail", "redeemedAt"
+      ]
+    },
+    "CourseFee": {
+      "title": "CourseFee",
+      "description": "Admin-configured course fee structure for individual and group classes.",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string", "description": "Target course ID matching document ID." },
+        "courseTitle": { "type": "string", "description": "Course title." },
+        "individualMonthlyInr": { "type": "integer", "description": "Monthly individual 1-to-1 class fee in INR." },
+        "groupMonthlyInr": { "type": "integer", "description": "Monthly group class fee in INR." },
+        "trialEnabled": { "type": "boolean", "description": "Whether free trial assessment is enabled." },
+        "currency": { "type": "string", "enum": ["INR"], "description": "Currency code." },
+        "visibility": { "type": "string", "enum": ["public"], "description": "Public visibility for signed-in users." },
+        "updatedBy": { "type": "string", "description": "Admin UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "courseId", "courseTitle", "individualMonthlyInr", "groupMonthlyInr",
+        "trialEnabled", "currency", "visibility", "updatedBy", "createdAt", "updatedAt"
+      ]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Razorpay transaction record without sensitive card data; enrollment activates only after verified status.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Backend Razorpay order ID matching document ID." },
+        "razorpayPaymentId": { "type": "string", "description": "Razorpay payment ID upon checkout completion." },
+        "userId": { "type": "string", "description": "Student UID." },
+        "userName": { "type": "string", "description": "Student display name." },
+        "userEmail": { "type": "string", "description": "Student email." },
+        "courseId": { "type": "string", "description": "Enrolled course ID." },
+        "courseTitle": { "type": "string", "description": "Enrolled course title." },
+        "planType": { "type": "string", "enum": ["individual", "group", "trial"], "description": "Fee tier selected." },
+        "amountInr": { "type": "integer", "description": "Amount in INR." },
+        "currency": { "type": "string", "enum": ["INR"], "description": "Currency code." },
+        "paymentMethod": { "type": "string", "description": "Payment method label (e.g., UPI, Razorpay Checkout)." },
+        "status": { "type": "string", "enum": ["created", "pending", "verified", "failed", "refunded"], "description": "Payment verification status." },
+        "signatureVerified": { "type": "boolean", "description": "True only after backend HMAC verification." },
+        "receiptNumber": { "type": "string", "description": "Issued receipt number after verification." },
+        "invitationCode": { "type": "string", "description": "Attributed invitation code if present." },
+        "failureReason": { "type": "string", "description": "Failure or refund reason if applicable." },
+        "whatsappRedirected": { "type": "boolean", "description": "Whether student opened WhatsApp confirmation." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "orderId", "razorpayPaymentId", "userId", "userName", "userEmail",
+        "courseId", "courseTitle", "planType", "amountInr", "currency",
+        "paymentMethod", "status", "signatureVerified", "receiptNumber",
+        "invitationCode", "failureReason", "whatsappRedirected", "createdAt", "updatedAt"
+      ]
+    },
+    "AdminGroup": {
+      "title": "AdminGroup",
+      "description": "Admin-managed study circle (Halaqah) with invite sharing control.",
+      "type": "object",
+      "properties": {
+        "arabicTitle": { "type": "string", "description": "Arabic circle title." },
+        "englishTitle": { "type": "string", "description": "English circle title." },
+        "subject": { "type": "string", "description": "Subject." },
+        "track": { "type": "string", "description": "Curriculum track." },
+        "teacherName": { "type": "string", "description": "Teacher name." },
+        "teacherEmail": { "type": "string", "description": "Teacher Google email." },
+        "country": { "type": "string", "description": "Country." },
+        "currentMembers": { "type": "integer", "description": "Current member count." },
+        "maxMembers": { "type": "integer", "description": "Maximum capacity." },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Expert"], "description": "Level." },
+        "language": { "type": "string", "description": "Instruction language." },
+        "allowStudentInvite": { "type": "boolean", "description": "Whether enrolled students may share group invite links." },
+        "visibility": { "type": "string", "enum": ["public"], "description": "Public visibility for signed-in users." },
+        "createdBy": { "type": "string", "description": "Admin UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "arabicTitle", "englishTitle", "subject", "track", "teacherName",
+        "teacherEmail", "country", "currentMembers", "maxMembers", "level",
+        "language", "allowStudentInvite", "visibility", "createdBy", "createdAt", "updatedAt"
+      ]
+    },
+    "StudentEnrollment": {
+      "title": "StudentEnrollment",
+      "description": "Platform-wide student enrollment directory for admin management & live class access gating.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Student UID." },
+        "userName": { "type": "string", "description": "Student name." },
+        "userEmail": { "type": "string", "description": "Student email." },
+        "targetId": { "type": "string", "description": "Course or group ID." },
+        "targetType": { "type": "string", "enum": ["course", "group"], "description": "Course or group." },
+        "title": { "type": "string", "description": "Course or group title." },
+        "arabicTitle": { "type": "string", "description": "Arabic title." },
+        "track": { "type": "string", "description": "Track." },
+        "mode": { "type": "string", "enum": ["Online", "Offline"], "description": "Delivery mode." },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Expert"], "description": "Level." },
+        "language": { "type": "string", "description": "Language." },
+        "teacherName": { "type": "string", "description": "Assigned teacher name." },
+        "teacherCountry": { "type": "string", "description": "Teacher country." },
+        "feePlan": { "type": "string", "description": "Selected fee plan summary." },
+        "paymentId": { "type": "string", "description": "Associated payment orderId or free_trial." },
+        "paymentStatus": { "type": "string", "enum": ["free_trial", "verified", "pending", "refunded"], "description": "Payment verification status." },
+        "enrollmentStatus": { "type": "string", "enum": ["pending_assessment", "active", "completed", "cancelled"], "description": "Lifecycle status." },
+        "assignedGroupId": { "type": "string", "description": "Assigned group ID if allocated." },
+        "completedSessions": { "type": "integer", "description": "Completed sessions." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "userId", "userName", "userEmail", "targetId", "targetType", "title",
+        "arabicTitle", "track", "mode", "level", "language", "teacherName",
+        "teacherCountry", "feePlan", "paymentId", "paymentStatus",
+        "enrollmentStatus", "assignedGroupId", "completedSessions", "createdAt", "updatedAt"
+      ]
+    },
+    "LiveClass": {
+      "title": "LiveClass",
+      "description": "Scheduled live Qur'an/Tajweed session linked to course, group, teacher, and Google Meet.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Live class title." },
+        "courseId": { "type": "string", "description": "Linked course ID." },
+        "courseTitle": { "type": "string", "description": "Linked course title." },
+        "groupId": { "type": "string", "description": "Assigned student group ID." },
+        "groupTitle": { "type": "string", "description": "Assigned group title." },
+        "teacherName": { "type": "string", "description": "Assigned teacher display name." },
+        "teacherEmail": { "type": "string", "description": "Lowercase teacher Google email for teacher dashboard access." },
+        "scheduledEpochMs": { "type": "integer", "description": "Start timestamp in UTC epoch milliseconds." },
+        "dateTimeLabel": { "type": "string", "description": "Formatted date and time label." },
+        "durationMinutes": { "type": "integer", "description": "Class duration in minutes." },
+        "description": { "type": "string", "description": "Agenda and Tajweed notes." },
+        "meetSource": { "type": "string", "enum": ["google_calendar_api", "manual"], "description": "How the Meet link was created." },
+        "calendarEventId": { "type": "string", "description": "Google Calendar event ID when auto-generated." },
+        "status": { "type": "string", "enum": ["scheduled", "completed", "cancelled"], "description": "Class schedule state." },
+        "lastUpdateNote": { "type": "string", "description": "Latest announcement or teacher note." },
+        "visibility": { "type": "string", "enum": ["public"], "description": "Schedule metadata visibility for signed-in users." },
+        "createdBy": { "type": "string", "description": "Admin UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": [
+        "title", "courseId", "courseTitle", "groupId", "groupTitle",
+        "teacherName", "teacherEmail", "scheduledEpochMs", "dateTimeLabel",
+        "durationMinutes", "description", "meetSource", "calendarEventId",
+        "status", "lastUpdateNote", "visibility", "createdBy", "createdAt", "updatedAt"
+      ]
+    },
+    "LiveClassAccess": {
+      "title": "LiveClassAccess",
+      "description": "Access-gated Google Meet join URL accessible only to enrolled course/group students, assigned teacher, or admin.",
+      "type": "object",
+      "properties": {
+        "meetUrl": { "type": "string", "description": "Google Meet URI." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update." }
+      },
+      "required": ["meetUrl", "updatedAt"]
+    },
+    "ClassNotification": {
+      "title": "ClassNotification",
+      "description": "Schedule alerts when a live class is scheduled, rescheduled, cancelled, or updated by teacher.",
+      "type": "object",
+      "properties": {
+        "classId": { "type": "string", "description": "Related live class ID." },
+        "courseId": { "type": "string", "description": "Related course ID." },
+        "groupId": { "type": "string", "description": "Related group ID." },
+        "title": { "type": "string", "description": "Alert title." },
+        "message": { "type": "string", "description": "Alert message body." },
+        "eventType": { "type": "string", "enum": ["scheduled", "rescheduled", "cancelled", "reminder", "teacher_update"], "description": "Notification type." },
+        "visibility": { "type": "string", "enum": ["public"], "description": "Visibility." },
+        "createdBy": { "type": "string", "description": "Creator UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation." }
+      },
+      "required": ["classId", "courseId", "groupId", "title", "message", "eventType", "visibility", "createdBy", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Student profile, theme/language preferences, and cumulative analytics."
+    },
+    "/users/{userId}/juz_progress/{juzId}": {
+      "schema": { "$ref": "#/entities/JuzProgress" },
+      "description": "Individual Juz 1..30 progress entries for the student."
+    },
+    "/users/{userId}/enrollments/{enrollmentId}": {
+      "schema": { "$ref": "#/entities/Enrollment" },
+      "description": "Courses and study groups joined by the student."
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/StudentNote" },
+      "description": "Tajweed corrections and personal Ayah annotations."
+    },
+    "/users/{userId}/study_plans/{planId}": {
+      "schema": { "$ref": "#/entities/StudyPlan" },
+      "description": "Student custom Hifz and review schedules."
+    },
+    "/users/{userId}/tests/{testId}": {
+      "schema": { "$ref": "#/entities/OralTest" },
+      "description": "Scheduled and graded oral recitation exams."
+    },
+    "/users/{userId}/certificates/{certId}": {
+      "schema": { "$ref": "#/entities/Certificate" },
+      "description": "Earned completion certificates."
+    },
+    "/users/{userId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/DirectMessage" },
+      "description": "Direct messages with teachers or support."
+    },
+    "/users/{userId}/session_logs/{logId}": {
+      "schema": { "$ref": "#/entities/SessionLog" },
+      "description": "Attended session logs for Progress Analytics."
+    },
+    "/users/{userId}/feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/AppFeedback" },
+      "description": "Student app feedback ratings."
+    },
+    "/admin_courses/{courseId}": {
+      "schema": { "$ref": "#/entities/AdminCourse" },
+      "description": "Admin-added or edited courses visible to all signed-in students."
+    },
+    "/admin_teachers/{teacherId}": {
+      "schema": { "$ref": "#/entities/AdminTeacher" },
+      "description": "Admin-added or edited Quran teachers/reciters visible to all signed-in students."
+    },
+    "/admin_managers/{managerId}": {
+      "schema": { "$ref": "#/entities/AdminManager" },
+      "description": "Managers appointed by the platform administrator, keyed by lowercase email."
+    },
+    "/daily_quotes/{quoteId}": {
+      "schema": { "$ref": "#/entities/DailyQuote" },
+      "description": "Daily study Qur'an & Tajweed quotes managed exclusively by admin."
+    },
+    "/login_events/{eventId}": {
+      "schema": { "$ref": "#/entities/LoginEvent" },
+      "description": "User sign-in events with email for admin notifications."
+    },
+    "/invitations/{inviteId}": {
+      "schema": { "$ref": "#/entities/Invitation" },
+      "description": "Invitation and referral links created by admin or students."
+    },
+    "/invitation_redemptions/{redemptionId}": {
+      "schema": { "$ref": "#/entities/InvitationRedemption" },
+      "description": "Per-user invitation redemption & attribution records."
+    },
+    "/course_fees/{feeId}": {
+      "schema": { "$ref": "#/entities/CourseFee" },
+      "description": "Admin-configured individual and group monthly fees per course."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentRecord" },
+      "description": "Razorpay orders, verification states, receipts, and refund statuses."
+    },
+    "/admin_groups/{groupId}": {
+      "schema": { "$ref": "#/entities/AdminGroup" },
+      "description": "Admin-managed study circles with student link-sharing controls."
+    },
+    "/student_enrollments/{enrollmentDocId}": {
+      "schema": { "$ref": "#/entities/StudentEnrollment" },
+      "description": "Deterministic student enrollment records for admin oversight and live class access verification."
+    },
+    "/live_classes/{classId}": {
+      "schema": { "$ref": "#/entities/LiveClass" },
+      "description": "Scheduled Google Meet live classes linked to course, group, and teacher."
+    },
+    "/live_classes/{classId}/private/{accessDoc}": {
+      "schema": { "$ref": "#/entities/LiveClassAccess" },
+      "description": "Protected Google Meet URL document gated by enrollment or teacher assignment."
+    },
+    "/class_notifications/{notifId}": {
+      "schema": { "$ref": "#/entities/ClassNotification" },
+      "description": "Live class schedule alerts and teacher updates."
+    }
+  }
+}

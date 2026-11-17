@@ -1,0 +1,987 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isValidEmailId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 160 && id.matches('^[a-z0-9._%+\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}$');
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() &&
+        request.auth.token.email == 'muhammadkerala2165@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    // Only call inside single-document get/create/update/delete, NEVER inside allow list
+    function isActiveManager() {
+      return isSignedIn() &&
+        request.auth.token.email_verified == true &&
+        request.auth.token.email != null &&
+        exists(/databases/$(database)/documents/admin_managers/$(request.auth.token.email.lower())) &&
+        get(/databases/$(database)/documents/admin_managers/$(request.auth.token.email.lower())).data.status == 'active';
+    }
+
+    function isAdminOrManager() {
+      return isBootstrappedAdmin() || isActiveManager();
+    }
+
+    // --- Validation Helpers ---
+    function isValidUserProfile(data, userId) {
+      return data.userId is string && data.userId == userId &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        data.arabicName is string && data.arabicName.size() >= 1 && data.arabicName.size() <= 100 &&
+        data.email is string && data.email.size() <= 160 &&
+        data.phone is string && data.phone.size() <= 32 &&
+        data.country is string && data.country.size() >= 1 && data.country.size() <= 80 &&
+        data.jobTitle is string && data.jobTitle.size() >= 1 && data.jobTitle.size() <= 80 &&
+        data.dateOfBirth is string && data.dateOfBirth.size() <= 40 &&
+        data.gender in ['Male', 'Female'] &&
+        data.preferredLanguage in ['en', 'ar', 'ur'] &&
+        data.themeMode in ['system', 'light', 'dark'] &&
+        data.readingHours is number && data.readingHours >= 0 && data.readingHours <= 100000 &&
+        data.avgRating is number && data.avgRating >= 0 && data.avgRating <= 5 &&
+        data.oneToOneCount is int && data.oneToOneCount >= 0 &&
+        data.attendedSessionsCount is int && data.attendedSessionsCount >= 0 &&
+        data.testsCompletedCount is int && data.testsCompletedCount >= 0 &&
+        data.memorizedPages is int && data.memorizedPages >= 0 && data.memorizedPages <= 604 &&
+        data.memorizedSurahs is int && data.memorizedSurahs >= 0 && data.memorizedSurahs <= 114 &&
+        data.memorizedJuz is int && data.memorizedJuz >= 0 && data.memorizedJuz <= 30 &&
+        data.memorizedAyahs is int && data.memorizedAyahs >= 0 && data.memorizedAyahs <= 6236 &&
+        data.memorizedLetters is int && data.memorizedLetters >= 0 &&
+        data.gainedDeeds is int && data.gainedDeeds >= 0 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidJuzProgress(data) {
+      return data.juzNumber is int && data.juzNumber >= 1 && data.juzNumber <= 30 &&
+        data.status in ['completed', 'in_progress', 'incomplete'] &&
+        data.surahSummary is string && data.surahSummary.size() >= 1 && data.surahSummary.size() <= 160 &&
+        data.completedAyahs is int && data.completedAyahs >= 0 &&
+        data.totalAyahs is int && data.totalAyahs >= 1 && data.completedAyahs <= data.totalAyahs &&
+        data.teacherRating is number && data.teacherRating >= 0 && data.teacherRating <= 5 &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidEnrollment(data) {
+      return data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128 &&
+        data.targetType in ['course', 'group'] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+        data.arabicTitle is string && data.arabicTitle.size() >= 1 && data.arabicTitle.size() <= 140 &&
+        data.track is string && data.track.size() >= 1 && data.track.size() <= 100 &&
+        data.mode in ['Online', 'Offline'] &&
+        data.level in ['Beginner', 'Intermediate', 'Expert'] &&
+        data.language is string && data.language.size() >= 1 && data.language.size() <= 40 &&
+        data.teacherName is string && data.teacherName.size() >= 1 && data.teacherName.size() <= 100 &&
+        data.teacherCountry is string && data.teacherCountry.size() >= 1 && data.teacherCountry.size() <= 80 &&
+        data.completedSessions is int && data.completedSessions >= 0 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidNote(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.surahRef is string && data.surahRef.size() >= 1 && data.surahRef.size() <= 80 &&
+        data.ayahRange is string && data.ayahRange.size() >= 1 && data.ayahRange.size() <= 40 &&
+        data.category in ['tajweed', 'feedback', 'personal'] &&
+        data.content is string && data.content.size() >= 1 && data.content.size() <= 1000 &&
+        data.teacherName is string && data.teacherName.size() <= 100 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidStudyPlan(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.dailyTargetPages is int && data.dailyTargetPages >= 1 && data.dailyTargetPages <= 100 &&
+        data.scheduleDays is string && data.scheduleDays.size() >= 1 && data.scheduleDays.size() <= 100 &&
+        data.preferredTime is string && data.preferredTime.size() >= 1 && data.preferredTime.size() <= 60 &&
+        data.status in ['active', 'paused'] &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidOralTest(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.juzRange is string && data.juzRange.size() >= 1 && data.juzRange.size() <= 60 &&
+        data.sheikhName is string && data.sheikhName.size() >= 1 && data.sheikhName.size() <= 100 &&
+        data.scheduledDate is string && data.scheduledDate.size() >= 1 && data.scheduledDate.size() <= 60 &&
+        data.status in ['scheduled', 'completed'] &&
+        data.score is int && data.score >= 0 && data.score <= 100 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCertificate(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+        data.track is string && data.track.size() >= 1 && data.track.size() <= 100 &&
+        data.issuedBy is string && data.issuedBy.size() >= 1 && data.issuedBy.size() <= 120 &&
+        data.verificationCode is string && data.verificationCode.size() >= 1 && data.verificationCode.size() <= 60 &&
+        data.issuedDate is string && data.issuedDate.size() >= 1 && data.issuedDate.size() <= 60 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidMessage(data) {
+      return data.reciterId is string && data.reciterId.size() >= 1 && data.reciterId.size() <= 128 &&
+        data.reciterName is string && data.reciterName.size() >= 1 && data.reciterName.size() <= 100 &&
+        data.senderRole in ['student', 'sheikh', 'support'] &&
+        data.body is string && data.body.size() >= 1 && data.body.size() <= 1000 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidSessionLog(data) {
+      return data.courseTitle is string && data.courseTitle.size() >= 1 && data.courseTitle.size() <= 140 &&
+        data.arabicTitle is string && data.arabicTitle.size() >= 1 && data.arabicTitle.size() <= 140 &&
+        data.teacherName is string && data.teacherName.size() >= 1 && data.teacherName.size() <= 100 &&
+        data.teacherCountry is string && data.teacherCountry.size() >= 1 && data.teacherCountry.size() <= 80 &&
+        data.level in ['Beginner', 'Intermediate', 'Expert'] &&
+        data.sessionCategory in ['guest', 'registered', 'one_to_one'] &&
+        data.completedSessions is int && data.completedSessions >= 0 &&
+        data.durationMinutes is int && data.durationMinutes >= 0 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidFeedback(data) {
+      return data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+        data.comment is string && data.comment.size() <= 500 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    function isValidAdminCourse(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+        data.arabicTitle is string && data.arabicTitle.size() >= 1 && data.arabicTitle.size() <= 140 &&
+        data.track is string && data.track.size() >= 1 && data.track.size() <= 100 &&
+        data.mode in ['Online', 'Offline'] &&
+        data.level in ['Beginner', 'Intermediate', 'Expert'] &&
+        data.language is string && data.language.size() >= 1 && data.language.size() <= 40 &&
+        data.teacherName is string && data.teacherName.size() >= 1 && data.teacherName.size() <= 100 &&
+        data.country is string && data.country.size() >= 1 && data.country.size() <= 80 &&
+        data.scheduleSummary is string && data.scheduleSummary.size() >= 1 && data.scheduleSummary.size() <= 100 &&
+        data.seatsLeft is int && data.seatsLeft >= 0 && data.seatsLeft <= 1000 &&
+        (!('description' in data.keys()) || (data.description is string && data.description.size() <= 500)) &&
+        data.visibility == 'public' &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAdminTeacher(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.arabicName is string && data.arabicName.size() >= 1 && data.arabicName.size() <= 100 &&
+        data.country is string && data.country.size() >= 1 && data.country.size() <= 80 &&
+        data.specialty is string && data.specialty.size() >= 1 && data.specialty.size() <= 160 &&
+        data.languagesText is string && data.languagesText.size() >= 1 && data.languagesText.size() <= 100 &&
+        data.rating is number && data.rating >= 0 && data.rating <= 5 &&
+        data.availableStatus in ['available', 'busy'] &&
+        data.visibility == 'public' &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAdminManager(data, managerId) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.email is string && data.email == managerId &&
+        data.phone is string && data.phone.size() <= 32 &&
+        data.role is string && data.role.size() >= 1 && data.role.size() <= 80 &&
+        data.status in ['active', 'paused'] &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidDailyQuote(data) {
+      return data.quoteText is string && data.quoteText.size() >= 1 && data.quoteText.size() <= 600 &&
+        data.arabicText is string && data.arabicText.size() <= 600 &&
+        data.source is string && data.source.size() >= 1 && data.source.size() <= 160 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 60 &&
+        data.dateLabel is string && data.dateLabel.size() >= 1 && data.dateLabel.size() <= 60 &&
+        data.visibility == 'public' &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidLoginEvent(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 120 &&
+        data.userEmail is string && data.userEmail.size() <= 160 &&
+        data.deviceInfo is string && data.deviceInfo.size() <= 120 &&
+        data.status in ['unread', 'read'] &&
+        isValidTimestamp(data.loginAt);
+    }
+
+    function isValidInvitation(data, inviteId) {
+      return data.code is string && data.code == inviteId && data.code.size() >= 4 && data.code.size() <= 40 &&
+        data.creatorId is string && data.creatorId.size() >= 1 && data.creatorId.size() <= 128 &&
+        data.creatorName is string && data.creatorName.size() >= 1 && data.creatorName.size() <= 100 &&
+        data.creatorEmail is string && data.creatorEmail.size() <= 160 &&
+        data.creatorRole in ['admin', 'student'] &&
+        data.targetType in ['general', 'course', 'group'] &&
+        data.targetId is string && data.targetId.size() <= 128 &&
+        data.targetTitle is string && data.targetTitle.size() >= 1 && data.targetTitle.size() <= 140 &&
+        data.maxUses is int && data.maxUses >= 1 && data.maxUses <= 100000 &&
+        data.usedCount is int && data.usedCount >= 0 && data.usedCount <= data.maxUses &&
+        data.expiresAtEpochMs is int && data.expiresAtEpochMs >= 0 &&
+        data.status in ['active', 'inactive'] &&
+        data.sharePermitted is bool &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidInvitationRedemption(data, redemptionId) {
+      return data.inviteId is string && data.inviteId.size() >= 4 && data.inviteId.size() <= 40 &&
+        data.inviteCode is string && data.inviteCode == data.inviteId &&
+        data.creatorId is string && data.creatorId.size() >= 1 && data.creatorId.size() <= 128 &&
+        data.targetType in ['general', 'course', 'group'] &&
+        data.targetId is string && data.targetId.size() <= 128 &&
+        data.targetTitle is string && data.targetTitle.size() >= 1 && data.targetTitle.size() <= 140 &&
+        data.userId is string && data.userId == redemptionId &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 100 &&
+        data.userEmail is string && data.userEmail.size() <= 160 &&
+        isValidTimestamp(data.redeemedAt);
+    }
+
+    function isValidCourseFee(data, feeId) {
+      return data.courseId is string && data.courseId == feeId && data.courseId.size() >= 1 && data.courseId.size() <= 128 &&
+        data.courseTitle is string && data.courseTitle.size() >= 1 && data.courseTitle.size() <= 140 &&
+        data.individualMonthlyInr is int && data.individualMonthlyInr >= 0 && data.individualMonthlyInr <= 1000000 &&
+        data.groupMonthlyInr is int && data.groupMonthlyInr >= 0 && data.groupMonthlyInr <= 1000000 &&
+        data.trialEnabled is bool &&
+        data.currency == 'INR' &&
+        data.visibility == 'public' &&
+        data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPayment(data, paymentId) {
+      return data.orderId is string && data.orderId == paymentId && data.orderId.size() >= 1 && data.orderId.size() <= 128 &&
+        data.razorpayPaymentId is string && data.razorpayPaymentId.size() <= 128 &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 100 &&
+        data.userEmail is string && data.userEmail.size() <= 160 &&
+        data.courseId is string && data.courseId.size() >= 1 && data.courseId.size() <= 128 &&
+        data.courseTitle is string && data.courseTitle.size() >= 1 && data.courseTitle.size() <= 140 &&
+        data.planType in ['individual', 'group', 'trial'] &&
+        data.amountInr is int && data.amountInr >= 0 && data.amountInr <= 1000000 &&
+        data.currency == 'INR' &&
+        data.paymentMethod is string && data.paymentMethod.size() >= 1 && data.paymentMethod.size() <= 60 &&
+        data.status in ['created', 'pending', 'verified', 'failed', 'refunded'] &&
+        data.signatureVerified is bool &&
+        data.receiptNumber is string && data.receiptNumber.size() <= 64 &&
+        data.invitationCode is string && data.invitationCode.size() <= 40 &&
+        data.failureReason is string && data.failureReason.size() <= 300 &&
+        data.whatsappRedirected is bool &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAdminGroup(data) {
+      return data.arabicTitle is string && data.arabicTitle.size() >= 1 && data.arabicTitle.size() <= 140 &&
+        data.englishTitle is string && data.englishTitle.size() >= 1 && data.englishTitle.size() <= 140 &&
+        data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+        data.track is string && data.track.size() >= 1 && data.track.size() <= 100 &&
+        data.teacherName is string && data.teacherName.size() >= 1 && data.teacherName.size() <= 100 &&
+        data.teacherEmail is string && data.teacherEmail.size() <= 160 &&
+        data.country is string && data.country.size() >= 1 && data.country.size() <= 80 &&
+        data.currentMembers is int && data.currentMembers >= 0 && data.currentMembers <= 100000 &&
+        data.maxMembers is int && data.maxMembers >= 1 && data.maxMembers <= 100000 &&
+        data.level in ['Beginner', 'Intermediate', 'Expert'] &&
+        data.language is string && data.language.size() >= 1 && data.language.size() <= 40 &&
+        data.allowStudentInvite is bool &&
+        data.visibility == 'public' &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidStudentEnrollment(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 100 &&
+        data.userEmail is string && data.userEmail.size() <= 160 &&
+        data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128 &&
+        data.targetType in ['course', 'group'] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+        data.arabicTitle is string && data.arabicTitle.size() >= 1 && data.arabicTitle.size() <= 140 &&
+        data.track is string && data.track.size() >= 1 && data.track.size() <= 100 &&
+        data.mode in ['Online', 'Offline'] &&
+        data.level in ['Beginner', 'Intermediate', 'Expert'] &&
+        data.language is string && data.language.size() >= 1 && data.language.size() <= 40 &&
+        data.teacherName is string && data.teacherName.size() >= 1 && data.teacherName.size() <= 100 &&
+        data.teacherCountry is string && data.teacherCountry.size() >= 1 && data.teacherCountry.size() <= 80 &&
+        data.feePlan is string && data.feePlan.size() >= 1 && data.feePlan.size() <= 100 &&
+        data.paymentId is string && data.paymentId.size() <= 128 &&
+        data.paymentStatus in ['free_trial', 'verified', 'pending', 'refunded'] &&
+        data.enrollmentStatus in ['pending_assessment', 'active', 'completed', 'cancelled'] &&
+        data.assignedGroupId is string && data.assignedGroupId.size() <= 128 &&
+        data.completedSessions is int && data.completedSessions >= 0 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidLiveClass(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+        data.courseId is string && data.courseId.size() >= 1 && data.courseId.size() <= 128 &&
+        data.courseTitle is string && data.courseTitle.size() >= 1 && data.courseTitle.size() <= 140 &&
+        data.groupId is string && data.groupId.size() <= 128 &&
+        data.groupTitle is string && data.groupTitle.size() <= 140 &&
+        data.teacherName is string && data.teacherName.size() >= 1 && data.teacherName.size() <= 100 &&
+        data.teacherEmail is string && data.teacherEmail.size() <= 160 &&
+        data.scheduledEpochMs is int && data.scheduledEpochMs > 0 &&
+        data.dateTimeLabel is string && data.dateTimeLabel.size() >= 1 && data.dateTimeLabel.size() <= 80 &&
+        data.durationMinutes is int && data.durationMinutes >= 10 && data.durationMinutes <= 360 &&
+        data.description is string && data.description.size() <= 600 &&
+        data.meetSource in ['google_calendar_api', 'manual'] &&
+        data.calendarEventId is string && data.calendarEventId.size() <= 200 &&
+        data.status in ['scheduled', 'completed', 'cancelled'] &&
+        data.lastUpdateNote is string && data.lastUpdateNote.size() <= 500 &&
+        data.visibility == 'public' &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt) &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidLiveClassAccess(data) {
+      return data.meetUrl is string && data.meetUrl.size() >= 10 && data.meetUrl.size() <= 300 &&
+        data.meetUrl.matches('^https://meet\\.google\\.com/[a-zA-Z0-9\\-_]+.*$') &&
+        isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidClassNotification(data) {
+      return data.classId is string && data.classId.size() >= 1 && data.classId.size() <= 128 &&
+        data.courseId is string && data.courseId.size() <= 128 &&
+        data.groupId is string && data.groupId.size() <= 128 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 500 &&
+        data.eventType in ['scheduled', 'rescheduled', 'cancelled', 'reminder', 'teacher_update'] &&
+        data.visibility == 'public' &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidTimestamp(data.createdAt);
+    }
+
+    // --- Collection Rules ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        incoming().keys().hasAll([
+          'userId', 'displayName', 'arabicName', 'email', 'phone', 'country',
+          'jobTitle', 'dateOfBirth', 'gender', 'preferredLanguage', 'themeMode',
+          'readingHours', 'avgRating', 'oneToOneCount', 'attendedSessionsCount',
+          'testsCompletedCount', 'memorizedPages', 'memorizedSurahs', 'memorizedJuz',
+          'memorizedAyahs', 'memorizedLetters', 'gainedDeeds', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'displayName', 'arabicName', 'email', 'phone', 'country',
+          'jobTitle', 'dateOfBirth', 'gender', 'preferredLanguage', 'themeMode',
+          'readingHours', 'avgRating', 'oneToOneCount', 'attendedSessionsCount',
+          'testsCompletedCount', 'memorizedPages', 'memorizedSurahs', 'memorizedJuz',
+          'memorizedAyahs', 'memorizedLetters', 'gainedDeeds', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidUserProfile(incoming(), userId);
+
+      allow update: if isOwner(userId) && isValidId(userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'arabicName', 'phone', 'country', 'jobTitle',
+          'dateOfBirth', 'gender', 'preferredLanguage', 'themeMode',
+          'readingHours', 'avgRating', 'oneToOneCount', 'attendedSessionsCount',
+          'testsCompletedCount', 'memorizedPages', 'memorizedSurahs', 'memorizedJuz',
+          'memorizedAyahs', 'memorizedLetters', 'gainedDeeds', 'updatedAt'
+        ]);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /juz_progress/{juzId} {
+        allow get: if isOwner(userId) && isValidId(juzId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(juzId) &&
+          incoming().keys().hasAll(['juzNumber', 'status', 'surahSummary', 'completedAyahs', 'totalAyahs', 'teacherRating', 'updatedAt']) &&
+          incoming().keys().hasOnly(['juzNumber', 'status', 'surahSummary', 'completedAyahs', 'totalAyahs', 'teacherRating', 'updatedAt']) &&
+          isValidJuzProgress(incoming());
+        allow update: if isOwner(userId) && isValidId(juzId) &&
+          incoming().juzNumber == existing().juzNumber &&
+          isValidJuzProgress(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'completedAyahs', 'teacherRating', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(juzId);
+      }
+
+      match /enrollments/{enrollmentId} {
+        allow get: if isOwner(userId) && isValidId(enrollmentId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(enrollmentId) &&
+          incoming().keys().hasAll(['targetId', 'targetType', 'title', 'arabicTitle', 'track', 'mode', 'level', 'language', 'teacherName', 'teacherCountry', 'completedSessions', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['targetId', 'targetType', 'title', 'arabicTitle', 'track', 'mode', 'level', 'language', 'teacherName', 'teacherCountry', 'completedSessions', 'createdAt', 'updatedAt']) &&
+          isValidEnrollment(incoming());
+        allow update: if isOwner(userId) && isValidId(enrollmentId) &&
+          incoming().targetId == existing().targetId &&
+          incoming().createdAt == existing().createdAt &&
+          isValidEnrollment(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['completedSessions', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(enrollmentId);
+      }
+
+      match /notes/{noteId} {
+        allow get: if isOwner(userId) && isValidId(noteId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(noteId) &&
+          incoming().keys().hasAll(['title', 'surahRef', 'ayahRange', 'category', 'content', 'teacherName', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['title', 'surahRef', 'ayahRange', 'category', 'content', 'teacherName', 'createdAt', 'updatedAt']) &&
+          isValidNote(incoming());
+        allow update: if isOwner(userId) && isValidId(noteId) &&
+          incoming().createdAt == existing().createdAt &&
+          isValidNote(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'surahRef', 'ayahRange', 'category', 'content', 'teacherName', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(noteId);
+      }
+
+      match /study_plans/{planId} {
+        allow get: if isOwner(userId) && isValidId(planId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(planId) &&
+          incoming().keys().hasAll(['title', 'dailyTargetPages', 'scheduleDays', 'preferredTime', 'status', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['title', 'dailyTargetPages', 'scheduleDays', 'preferredTime', 'status', 'createdAt', 'updatedAt']) &&
+          isValidStudyPlan(incoming());
+        allow update: if isOwner(userId) && isValidId(planId) &&
+          incoming().createdAt == existing().createdAt &&
+          isValidStudyPlan(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'dailyTargetPages', 'scheduleDays', 'preferredTime', 'status', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(planId);
+      }
+
+      match /tests/{testId} {
+        allow get: if isOwner(userId) && isValidId(testId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(testId) &&
+          incoming().keys().hasAll(['title', 'juzRange', 'sheikhName', 'scheduledDate', 'status', 'score', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['title', 'juzRange', 'sheikhName', 'scheduledDate', 'status', 'score', 'createdAt', 'updatedAt']) &&
+          isValidOralTest(incoming());
+        allow update: if isOwner(userId) && isValidId(testId) &&
+          existing().status != 'completed' &&
+          incoming().createdAt == existing().createdAt &&
+          isValidOralTest(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'score', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(testId);
+      }
+
+      match /certificates/{certId} {
+        allow get: if isOwner(userId) && isValidId(certId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(certId) &&
+          incoming().keys().hasAll(['title', 'track', 'issuedBy', 'verificationCode', 'issuedDate', 'createdAt']) &&
+          incoming().keys().hasOnly(['title', 'track', 'issuedBy', 'verificationCode', 'issuedDate', 'createdAt']) &&
+          isValidCertificate(incoming());
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(certId);
+      }
+
+      match /messages/{messageId} {
+        allow get: if isOwner(userId) && isValidId(messageId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(messageId) &&
+          incoming().keys().hasAll(['reciterId', 'reciterName', 'senderRole', 'body', 'createdAt']) &&
+          incoming().keys().hasOnly(['reciterId', 'reciterName', 'senderRole', 'body', 'createdAt']) &&
+          isValidMessage(incoming());
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(messageId);
+      }
+
+      match /session_logs/{logId} {
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(logId) &&
+          incoming().keys().hasAll(['courseTitle', 'arabicTitle', 'teacherName', 'teacherCountry', 'level', 'sessionCategory', 'completedSessions', 'durationMinutes', 'createdAt']) &&
+          incoming().keys().hasOnly(['courseTitle', 'arabicTitle', 'teacherName', 'teacherCountry', 'level', 'sessionCategory', 'completedSessions', 'durationMinutes', 'createdAt']) &&
+          isValidSessionLog(incoming());
+        allow update: if isOwner(userId) && isValidId(logId) &&
+          incoming().createdAt == existing().createdAt &&
+          isValidSessionLog(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['completedSessions', 'durationMinutes']);
+        allow delete: if isOwner(userId) && isValidId(logId);
+      }
+
+      match /feedback/{feedbackId} {
+        allow get: if isOwner(userId) && isValidId(feedbackId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(feedbackId) &&
+          incoming().keys().hasAll(['rating', 'comment', 'createdAt']) &&
+          incoming().keys().hasOnly(['rating', 'comment', 'createdAt']) &&
+          isValidFeedback(incoming());
+        allow update, delete: if false;
+      }
+    }
+
+    match /admin_courses/{courseId} {
+      allow get, list: if isSignedIn() && resource.data.visibility == 'public';
+      allow create: if isAdminOrManager() && isValidId(courseId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().keys().hasAll([
+          'title', 'arabicTitle', 'track', 'mode', 'level', 'language',
+          'teacherName', 'country', 'scheduleSummary', 'seatsLeft',
+          'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'title', 'arabicTitle', 'track', 'mode', 'level', 'language',
+          'teacherName', 'country', 'scheduleSummary', 'seatsLeft', 'description',
+          'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidAdminCourse(incoming());
+      allow update: if isBootstrappedAdmin() && isValidId(courseId) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        isValidAdminCourse(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'arabicTitle', 'track', 'mode', 'level', 'language',
+          'teacherName', 'country', 'scheduleSummary', 'seatsLeft', 'description', 'updatedAt'
+        ]);
+      allow delete: if isAdminOrManager() && isValidId(courseId);
+    }
+
+    match /admin_teachers/{teacherId} {
+      allow get, list: if isSignedIn() && resource.data.visibility == 'public';
+      allow create: if isAdminOrManager() && isValidId(teacherId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().keys().hasAll([
+          'name', 'arabicName', 'country', 'specialty', 'languagesText',
+          'rating', 'availableStatus', 'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'name', 'arabicName', 'country', 'specialty', 'languagesText',
+          'rating', 'availableStatus', 'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidAdminTeacher(incoming());
+      allow update: if isBootstrappedAdmin() && isValidId(teacherId) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        isValidAdminTeacher(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'arabicName', 'country', 'specialty', 'languagesText',
+          'rating', 'availableStatus', 'updatedAt'
+        ]);
+      allow delete: if isAdminOrManager() && isValidId(teacherId);
+    }
+
+    match /admin_managers/{managerId} {
+      allow get, list: if isBootstrappedAdmin() ||
+        (isSignedIn() && request.auth.token.email != null && resource.data.email == request.auth.token.email.lower());
+      allow create: if isBootstrappedAdmin() && isValidEmailId(managerId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().keys().hasAll(['name', 'email', 'phone', 'role', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['name', 'email', 'phone', 'role', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        isValidAdminManager(incoming(), managerId);
+      allow update: if isBootstrappedAdmin() && isValidEmailId(managerId) &&
+        incoming().email == existing().email &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        isValidAdminManager(incoming(), managerId) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'role', 'status', 'updatedAt']);
+      allow delete: if isBootstrappedAdmin() && isValidEmailId(managerId);
+    }
+
+    match /daily_quotes/{quoteId} {
+      allow get, list: if isSignedIn() && resource.data.visibility == 'public';
+      allow create: if isBootstrappedAdmin() && isValidId(quoteId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().keys().hasAll(['quoteText', 'arabicText', 'source', 'category', 'dateLabel', 'visibility', 'createdBy', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['quoteText', 'arabicText', 'source', 'category', 'dateLabel', 'visibility', 'createdBy', 'createdAt', 'updatedAt']) &&
+        isValidDailyQuote(incoming());
+      allow update: if isBootstrappedAdmin() && isValidId(quoteId) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        isValidDailyQuote(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['quoteText', 'arabicText', 'source', 'category', 'dateLabel', 'updatedAt']);
+      allow delete: if isBootstrappedAdmin() && isValidId(quoteId);
+    }
+
+    match /login_events/{eventId} {
+      allow get, list: if isBootstrappedAdmin();
+      allow create: if isSignedIn() && isValidId(eventId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll(['userId', 'userName', 'userEmail', 'deviceInfo', 'status', 'loginAt']) &&
+        incoming().keys().hasOnly(['userId', 'userName', 'userEmail', 'deviceInfo', 'status', 'loginAt']) &&
+        isValidLoginEvent(incoming());
+      allow update: if isBootstrappedAdmin() && isValidId(eventId) &&
+        incoming().userId == existing().userId &&
+        incoming().loginAt == existing().loginAt &&
+        isValidLoginEvent(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isBootstrappedAdmin() && isValidId(eventId);
+    }
+
+    // --- Invitations & Attribution ---
+    match /invitations/{inviteId} {
+      allow get: if isSignedIn() && isValidId(inviteId);
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.creatorId == request.auth.uid);
+      allow create: if isValidId(inviteId) &&
+        incoming().keys().hasAll([
+          'code', 'creatorId', 'creatorName', 'creatorEmail', 'creatorRole',
+          'targetType', 'targetId', 'targetTitle', 'maxUses', 'usedCount',
+          'expiresAtEpochMs', 'status', 'sharePermitted', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'code', 'creatorId', 'creatorName', 'creatorEmail', 'creatorRole',
+          'targetType', 'targetId', 'targetTitle', 'maxUses', 'usedCount',
+          'expiresAtEpochMs', 'status', 'sharePermitted', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().usedCount == 0 &&
+        incoming().creatorId == request.auth.uid &&
+        isValidInvitation(incoming(), inviteId) &&
+        (
+          (isBootstrappedAdmin() && incoming().creatorRole == 'admin') ||
+          (isSignedIn() && incoming().creatorRole == 'student' && (
+            incoming().targetType != 'group' ||
+            (
+              incoming().targetId.size() > 0 &&
+              (
+                !exists(/databases/$(database)/documents/admin_groups/$(incoming().targetId)) ||
+                get(/databases/$(database)/documents/admin_groups/$(incoming().targetId)).data.allowStudentInvite == true
+              )
+            )
+          ))
+        );
+      allow update: if isValidId(inviteId) &&
+        isValidInvitation(incoming(), inviteId) &&
+        incoming().code == existing().code &&
+        incoming().creatorId == existing().creatorId &&
+        incoming().creatorRole == existing().creatorRole &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          (
+            isBootstrappedAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'maxUses', 'expiresAtEpochMs', 'sharePermitted', 'targetTitle', 'updatedAt'])
+          ) ||
+          (
+            isSignedIn() && existing().creatorId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          ) ||
+          (
+            isSignedIn() &&
+            existing().status == 'active' &&
+            (existing().expiresAtEpochMs == 0 || existing().expiresAtEpochMs > request.time.toMillis()) &&
+            incoming().usedCount == existing().usedCount + 1 &&
+            incoming().usedCount <= existing().maxUses &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['usedCount', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(inviteId) && (isBootstrappedAdmin() || (isSignedIn() && existing().creatorId == request.auth.uid));
+    }
+
+    match /invitation_redemptions/{redemptionId} {
+      allow get: if isSignedIn() && isValidId(redemptionId) &&
+        (isBootstrappedAdmin() || redemptionId == request.auth.uid || resource.data.creatorId == request.auth.uid);
+      allow list: if isBootstrappedAdmin() ||
+        (isSignedIn() && resource.data.creatorId == request.auth.uid) ||
+        (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(redemptionId) &&
+        redemptionId == request.auth.uid &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll([
+          'inviteId', 'inviteCode', 'creatorId', 'targetType', 'targetId',
+          'targetTitle', 'userId', 'userName', 'userEmail', 'redeemedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'inviteId', 'inviteCode', 'creatorId', 'targetType', 'targetId',
+          'targetTitle', 'userId', 'userName', 'userEmail', 'redeemedAt'
+        ]) &&
+        isValidInvitationRedemption(incoming(), redemptionId) &&
+        exists(/databases/$(database)/documents/invitations/$(incoming().inviteId));
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(redemptionId);
+    }
+
+    // --- Course Fee Configuration ---
+    match /course_fees/{feeId} {
+      allow get, list: if isSignedIn() && resource.data.visibility == 'public';
+      allow create: if isBootstrappedAdmin() && isValidId(feeId) &&
+        incoming().keys().hasAll([
+          'courseId', 'courseTitle', 'individualMonthlyInr', 'groupMonthlyInr',
+          'trialEnabled', 'currency', 'visibility', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'courseId', 'courseTitle', 'individualMonthlyInr', 'groupMonthlyInr',
+          'trialEnabled', 'currency', 'visibility', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().updatedBy == request.auth.uid &&
+        isValidCourseFee(incoming(), feeId);
+      allow update: if isBootstrappedAdmin() && isValidId(feeId) &&
+        incoming().courseId == existing().courseId &&
+        incoming().createdAt == existing().createdAt &&
+        isValidCourseFee(incoming(), feeId) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'courseTitle', 'individualMonthlyInr', 'groupMonthlyInr',
+          'trialEnabled', 'updatedBy', 'updatedAt'
+        ]);
+      allow delete: if isBootstrappedAdmin() && isValidId(feeId);
+    }
+
+    // --- Razorpay Payments & Receipts ---
+    match /payments/{paymentId} {
+      allow get: if isSignedIn() && isValidId(paymentId) && (isBootstrappedAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(paymentId) &&
+        incoming().keys().hasAll([
+          'orderId', 'razorpayPaymentId', 'userId', 'userName', 'userEmail',
+          'courseId', 'courseTitle', 'planType', 'amountInr', 'currency',
+          'paymentMethod', 'status', 'signatureVerified', 'receiptNumber',
+          'invitationCode', 'failureReason', 'whatsappRedirected', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'orderId', 'razorpayPaymentId', 'userId', 'userName', 'userEmail',
+          'courseId', 'courseTitle', 'planType', 'amountInr', 'currency',
+          'paymentMethod', 'status', 'signatureVerified', 'receiptNumber',
+          'invitationCode', 'failureReason', 'whatsappRedirected', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().userId == request.auth.uid &&
+        incoming().status in ['created', 'pending'] &&
+        incoming().signatureVerified == false &&
+        isValidPayment(incoming(), paymentId);
+      allow update: if isValidId(paymentId) &&
+        isValidPayment(incoming(), paymentId) &&
+        incoming().orderId == existing().orderId &&
+        incoming().userId == existing().userId &&
+        incoming().courseId == existing().courseId &&
+        incoming().amountInr == existing().amountInr &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          (
+            isBootstrappedAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'failureReason', 'updatedAt'])
+          ) ||
+          (
+            isSignedIn() && existing().userId == request.auth.uid &&
+            (
+              (
+                existing().status in ['created', 'pending'] &&
+                incoming().status in ['pending', 'failed'] &&
+                incoming().signatureVerified == false &&
+                incoming().diff(existing()).affectedKeys().hasOnly(['status', 'failureReason', 'updatedAt'])
+              ) ||
+              (
+                existing().status in ['created', 'pending'] &&
+                incoming().status == 'verified' &&
+                incoming().signatureVerified == true &&
+                incoming().razorpayPaymentId.size() >= 6 &&
+                incoming().receiptNumber.size() >= 4 &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'signatureVerified', 'razorpayPaymentId',
+                  'receiptNumber', 'paymentMethod', 'whatsappRedirected', 'updatedAt'
+                ])
+              ) ||
+              (
+                existing().status == 'verified' &&
+                incoming().status == 'verified' &&
+                incoming().signatureVerified == true &&
+                incoming().diff(existing()).affectedKeys().hasOnly(['whatsappRedirected', 'updatedAt'])
+              )
+            )
+          )
+        );
+      allow delete: if isBootstrappedAdmin() && isValidId(paymentId);
+    }
+
+    // --- Admin Study Groups ---
+    match /admin_groups/{groupId} {
+      allow get, list: if isSignedIn() && resource.data.visibility == 'public';
+      allow create: if isBootstrappedAdmin() && isValidId(groupId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().keys().hasAll([
+          'arabicTitle', 'englishTitle', 'subject', 'track', 'teacherName',
+          'teacherEmail', 'country', 'currentMembers', 'maxMembers', 'level',
+          'language', 'allowStudentInvite', 'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'arabicTitle', 'englishTitle', 'subject', 'track', 'teacherName',
+          'teacherEmail', 'country', 'currentMembers', 'maxMembers', 'level',
+          'language', 'allowStudentInvite', 'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidAdminGroup(incoming());
+      allow update: if isBootstrappedAdmin() && isValidId(groupId) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        isValidAdminGroup(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'arabicTitle', 'englishTitle', 'subject', 'track', 'teacherName',
+          'teacherEmail', 'country', 'currentMembers', 'maxMembers', 'level',
+          'language', 'allowStudentInvite', 'updatedAt'
+        ]);
+      allow delete: if isBootstrappedAdmin() && isValidId(groupId);
+    }
+
+    // --- Platform-Wide Student Enrollments ---
+    match /student_enrollments/{enrollmentDocId} {
+      allow get: if isSignedIn() && isValidId(enrollmentDocId) &&
+        (isBootstrappedAdmin() || resource.data.userId == request.auth.uid);
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(enrollmentDocId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll([
+          'userId', 'userName', 'userEmail', 'targetId', 'targetType', 'title',
+          'arabicTitle', 'track', 'mode', 'level', 'language', 'teacherName',
+          'teacherCountry', 'feePlan', 'paymentId', 'paymentStatus',
+          'enrollmentStatus', 'assignedGroupId', 'completedSessions', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'userName', 'userEmail', 'targetId', 'targetType', 'title',
+          'arabicTitle', 'track', 'mode', 'level', 'language', 'teacherName',
+          'teacherCountry', 'feePlan', 'paymentId', 'paymentStatus',
+          'enrollmentStatus', 'assignedGroupId', 'completedSessions', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().paymentStatus in ['free_trial', 'verified', 'pending'] &&
+        isValidStudentEnrollment(incoming());
+      allow update: if isValidId(enrollmentDocId) &&
+        isValidStudentEnrollment(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().targetId == existing().targetId &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          (
+            isBootstrappedAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'enrollmentStatus', 'assignedGroupId', 'paymentStatus', 'level', 'completedSessions', 'updatedAt'
+            ])
+          ) ||
+          (
+            isSignedIn() && existing().userId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['completedSessions', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(enrollmentDocId) &&
+        (isBootstrappedAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+    }
+
+    // --- Live Classes & Access-Gated Google Meet URLs ---
+    match /live_classes/{classId} {
+      allow get, list: if isSignedIn() && resource.data.visibility == 'public';
+      allow create: if isBootstrappedAdmin() && isValidId(classId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().keys().hasAll([
+          'title', 'courseId', 'courseTitle', 'groupId', 'groupTitle',
+          'teacherName', 'teacherEmail', 'scheduledEpochMs', 'dateTimeLabel',
+          'durationMinutes', 'description', 'meetSource', 'calendarEventId',
+          'status', 'lastUpdateNote', 'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'title', 'courseId', 'courseTitle', 'groupId', 'groupTitle',
+          'teacherName', 'teacherEmail', 'scheduledEpochMs', 'dateTimeLabel',
+          'durationMinutes', 'description', 'meetSource', 'calendarEventId',
+          'status', 'lastUpdateNote', 'visibility', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidLiveClass(incoming());
+      allow update: if isValidId(classId) &&
+        isValidLiveClass(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          (
+            isBootstrappedAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'courseId', 'courseTitle', 'groupId', 'groupTitle',
+              'teacherName', 'teacherEmail', 'scheduledEpochMs', 'dateTimeLabel',
+              'durationMinutes', 'description', 'meetSource', 'calendarEventId',
+              'status', 'lastUpdateNote', 'updatedAt'
+            ])
+          ) ||
+          (
+            isSignedIn() &&
+            request.auth.token.email_verified == true &&
+            request.auth.token.email != null &&
+            request.auth.token.email.lower() == existing().teacherEmail &&
+            existing().status != 'cancelled' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['lastUpdateNote', 'status', 'updatedAt'])
+          )
+        );
+      allow delete: if isBootstrappedAdmin() && isValidId(classId);
+
+      match /private/{accessDoc} {
+        allow get: if accessDoc == 'access' && isValidId(classId) && (
+          isBootstrappedAdmin() ||
+          (
+            isSignedIn() &&
+            request.auth.token.email_verified == true &&
+            request.auth.token.email != null &&
+            request.auth.token.email.lower() == get(/databases/$(database)/documents/live_classes/$(classId)).data.teacherEmail
+          ) ||
+          (
+            isSignedIn() && (
+              exists(/databases/$(database)/documents/student_enrollments/$(request.auth.uid + '_crs_' + get(/databases/$(database)/documents/live_classes/$(classId)).data.courseId)) ||
+              (
+                get(/databases/$(database)/documents/live_classes/$(classId)).data.groupId.size() > 0 &&
+                exists(/databases/$(database)/documents/student_enrollments/$(request.auth.uid + '_grp_' + get(/databases/$(database)/documents/live_classes/$(classId)).data.groupId))
+              )
+            )
+          )
+        );
+        allow list: if false;
+        allow create: if isBootstrappedAdmin() && isValidId(classId) && accessDoc == 'access' &&
+          incoming().keys().hasAll(['meetUrl', 'updatedAt']) &&
+          incoming().keys().hasOnly(['meetUrl', 'updatedAt']) &&
+          isValidLiveClassAccess(incoming());
+        allow update: if isBootstrappedAdmin() && isValidId(classId) && accessDoc == 'access' &&
+          isValidLiveClassAccess(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['meetUrl', 'updatedAt']);
+        allow delete: if isBootstrappedAdmin() && isValidId(classId) && accessDoc == 'access';
+      }
+    }
+
+    match /class_notifications/{notifId} {
+      allow get, list: if isSignedIn() && resource.data.visibility == 'public';
+      allow create: if isValidId(notifId) &&
+        incoming().keys().hasAll([
+          'classId', 'courseId', 'groupId', 'title', 'message',
+          'eventType', 'visibility', 'createdBy', 'createdAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'classId', 'courseId', 'groupId', 'title', 'message',
+          'eventType', 'visibility', 'createdBy', 'createdAt'
+        ]) &&
+        incoming().createdBy == request.auth.uid &&
+        isValidClassNotification(incoming()) &&
+        (
+          isBootstrappedAdmin() ||
+          (
+            isSignedIn() &&
+            request.auth.token.email_verified == true &&
+            request.auth.token.email != null &&
+            exists(/databases/$(database)/documents/live_classes/$(incoming().classId)) &&
+            get(/databases/$(database)/documents/live_classes/$(incoming().classId)).data.teacherEmail == request.auth.token.email.lower()
+          )
+        );
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(notifId);
+    }
+  }
+}

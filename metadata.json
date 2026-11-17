@@ -1,0 +1,6 @@
+{
+  "name": "AL MAQRA",
+  "description": "Quran learning, live recitation circles, and 30-Juz memorization tracking platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
